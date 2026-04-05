@@ -41,6 +41,7 @@ def init_db():
             event_id        TEXT NOT NULL,
             name            TEXT NOT NULL,
             email           TEXT,
+            gender          TEXT NOT NULL DEFAULT 'unspecified',
             token           TEXT NOT NULL UNIQUE,
             assigned_to_id  TEXT,
             wishlist        TEXT,
@@ -55,20 +56,63 @@ init_db()
 def row_to_dict(row):
     return dict(row) if row else None
 
-def derangement_shuffle(ids):
-    """Fisher-Yates derangement: no element maps to itself."""
-    if len(ids) < 2:
-        return None
-    lst = list(ids)
-    for attempt in range(1000):
-        shuffled = list(lst)
-        for i in range(len(shuffled) - 1, 0, -1):
-            j = secrets.randbelow(i + 1)
-            shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
-        if all(shuffled[i] != lst[i] for i in range(len(lst))):
-            return shuffled
-    return None  # extremely unlikely
+def gender_aware_assign(participants):
+    """
+    Assign givers to receivers preferring cross-gender pairs.
+    Priority: male->female and female->male first.
+    Same-gender pairs only used when cross-gender is exhausted.
+    Everyone must be assigned exactly one person (no self-assignment).
+    """
+    import random
 
+    ids     = [p['id']     for p in participants]
+    genders = {p['id']: p['gender'] for p in participants}
+
+    males   = [p['id'] for p in participants if p['gender'] == 'male']
+    females = [p['id'] for p in participants if p['gender'] == 'female']
+    others  = [p['id'] for p in participants if p['gender'] == 'unspecified']
+
+    for _ in range(2000):
+        assignment = {}  # giver -> receiver
+
+        givers    = list(ids)
+        receivers = list(ids)
+        secrets.SystemRandom().shuffle(givers)
+        secrets.SystemRandom().shuffle(receivers)
+
+        # Build preference order: cross-gender pairs first
+        def preferred_receivers(giver_id, remaining):
+            g = genders[giver_id]
+            if g == 'male':
+                cross = [r for r in remaining if genders[r] == 'female' and r != giver_id]
+                same  = [r for r in remaining if genders[r] != 'female' and r != giver_id]
+            elif g == 'female':
+                cross = [r for r in remaining if genders[r] == 'male' and r != giver_id]
+                same  = [r for r in remaining if genders[r] != 'male' and r != giver_id]
+            else:
+                cross = [r for r in remaining if r != giver_id]
+                same  = []
+            secrets.SystemRandom().shuffle(cross)
+            secrets.SystemRandom().shuffle(same)
+            return cross + same
+
+        remaining = list(ids)
+        secrets.SystemRandom().shuffle(remaining)
+        success = True
+
+        for giver in givers:
+            options = preferred_receivers(giver, remaining)
+            if not options:
+                success = False
+                break
+            chosen = options[0]
+            assignment[giver] = chosen
+            remaining.remove(chosen)
+
+        if success and len(assignment) == len(ids):
+            return assignment
+
+    return None  # extremely unlikely
 # ── Routes: Serve Frontend ────────────────────────────────────────────────────
 
 @app.route('/')
@@ -110,7 +154,7 @@ def get_event(event_id):
     if not event:
         return jsonify(error='Event not found'), 404
     participants = [row_to_dict(r) for r in db.execute(
-        "SELECT id, name, email, token, wishlist FROM participants WHERE event_id=? ORDER BY rowid",
+        "SELECT id, name, email, gender, token, wishlist FROM participants WHERE event_id=? ORDER BY rowid",
         (event_id,)
     ).fetchall()]
     event['participants'] = participants
@@ -132,12 +176,15 @@ def add_participant(event_id):
     if not name:
         return jsonify(error='Name is required'), 400
     email = (data.get('email') or '').strip() or None
+    gender = (data.get('gender') or 'unspecified').strip()
+    if gender not in ('male', 'female', 'unspecified'):
+        gender = 'unspecified'
     pid = str(uuid.uuid4())
     token = secrets.token_urlsafe(16)
     db.execute(
-        "INSERT INTO participants (id, event_id, name, email, token) VALUES (?,?,?,?,?)",
-        (pid, event_id, name, email, token)
-    )
+    "INSERT INTO participants (id, event_id, name, email, gender, token) VALUES (?,?,?,?,?,?)",
+    (pid, event_id, name, email, gender, token)
+)
     db.commit()
     return jsonify(id=pid, name=name, email=email, token=token), 201
 
@@ -163,14 +210,14 @@ def assign(event_id):
         return jsonify(error='Event not found'), 404
     if event['is_assigned']:
         return jsonify(error='Already assigned'), 400
-    rows = db.execute("SELECT id FROM participants WHERE event_id=?", (event_id,)).fetchall()
-    ids = [r['id'] for r in rows]
-    if len(ids) < 3:
+    rows = db.execute("SELECT id, gender FROM participants WHERE event_id=?", (event_id,)).fetchall()
+    participants = [dict(r) for r in rows]
+    if len(participants) < 3:
         return jsonify(error='Need at least 3 participants to assign'), 400
-    shuffled = derangement_shuffle(ids)
-    if shuffled is None:
+    assignment = gender_aware_assign(participants)
+    if assignment is None:
         return jsonify(error='Could not generate valid assignment, try again'), 500
-    for giver_id, receiver_id in zip(ids, shuffled):
+    for giver_id, receiver_id in assignment.items():
         db.execute("UPDATE participants SET assigned_to_id=? WHERE id=?", (receiver_id, giver_id))
     db.execute("UPDATE events SET is_assigned=1 WHERE id=?", (event_id,))
     db.commit()

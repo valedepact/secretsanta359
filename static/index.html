@@ -294,6 +294,14 @@
             <label>Email (optional)</label>
             <input id="p-email" type="email" placeholder="elf@northpole.com"/>
           </div>
+          <div class="field">
+            <label>Gender</label>
+            <select id="p-gender" style="width:100%;padding:.65rem .9rem;background:rgba(255,255,255,.06);border:1px solid rgba(212,175,55,.2);border-radius:8px;color:var(--cream);font-family:'Crimson Text',serif;font-size:1.05rem;">
+            <option value="unspecified">Prefer not to say</option>
+            <option value="female">Female 👩</option>
+            <option value="male">Male 👨</option>
+          </select>
+        </div>
         </div>
         <button class="btn btn-ghost btn-sm" id="btn-add-p">+ Add Participant</button>
       </div>
@@ -513,7 +521,9 @@ function renderParticipants(list, assigned, eventId){
   }
   li.innerHTML = `
     <span>
-      <span class="pname">🧝 ${esc(p.name)}</span>
+      <span class="pname">
+        ${p.gender==='female'?'👩':p.gender==='male'?'👨':'🧝'} ${esc(p.name)}
+      </span>
       ${p.email?`<span class="pemail">${esc(p.email)}</span>`:''}
       ${assigned && p.token
         ? `<span style="display:block;font-size:.78rem;color:#7aaa7a;margin-top:.2rem;">Tap to open reveal →</span>`
@@ -562,9 +572,11 @@ document.getElementById('btn-add-p').addEventListener('click', async()=>{
   const email = document.getElementById('p-email').value.trim();
   if(!name){ toast('Enter a name',true); return; }
   try{
-    await api('POST',`/events/${currentEvent.id}/participants`,{name,email});
+    const gender = document.getElementById('p-gender').value;
+    await api('POST',`/events/${currentEvent.id}/participants`,{name,email,gender});
     document.getElementById('p-name').value='';
     document.getElementById('p-email').value='';
+    document.getElementById('p-gender').value='unspecified';
     await loadEvent(currentEvent.id);
     toast(`${name} added! 🎅`);
   }catch(e){ toast(e.message,true); }
