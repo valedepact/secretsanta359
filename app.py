@@ -1,56 +1,16 @@
 import os
 import uuid
 import secrets
-import sqlite3
-import json
 from datetime import datetime
-from flask import Flask, request, jsonify, g, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
+from supabase import create_client, Client
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-DB_PATH = os.path.join(os.path.dirname(__file__), 'santa.db')
 
-# ── Database ──────────────────────────────────────────────────────────────────
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'YOUR_SUPABASE_URL_HERE')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'YOUR_SUPABASE_ANON_KEY_HERE')
 
-def get_db():
-    if 'db' not in g:
-        g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA journal_mode=WAL")
-    return g.db
-
-@app.teardown_appcontext
-def close_db(e=None):
-    db = g.pop('db', None)
-    if db:
-        db.close()
-
-def init_db():
-    with sqlite3.connect(DB_PATH) as db:
-        db.executescript("""
-        CREATE TABLE IF NOT EXISTS events (
-            id          TEXT PRIMARY KEY,
-            name        TEXT NOT NULL,
-            budget      REAL NOT NULL DEFAULT 0,
-            event_date  TEXT,
-            admin_pin   TEXT NOT NULL DEFAULT '',
-            is_assigned INTEGER NOT NULL DEFAULT 0,
-            created_at  TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS participants (
-            id              TEXT PRIMARY KEY,
-            event_id        TEXT NOT NULL,
-            name            TEXT NOT NULL,
-            email           TEXT,
-            gender          TEXT NOT NULL DEFAULT 'unspecified',
-            token           TEXT NOT NULL UNIQUE,
-            assigned_to_id  TEXT,
-            wishlist        TEXT,
-            FOREIGN KEY (event_id) REFERENCES events(id)
-        );
-        """)
-
-init_db()
+sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
