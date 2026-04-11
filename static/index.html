@@ -217,6 +217,21 @@
   .spin { animation: spin 1s linear infinite; display:inline-block; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
+  .recent-card {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .6rem .8rem; border-radius: 8px;
+    background: rgba(255,255,255,.04);
+    margin-bottom: .5rem;
+    transition: background .15s;
+  }
+  .recent-card:hover { background: rgba(212,175,55,.08); }
+  .recent-name { font-size: 1.05rem; margin-left: .5rem; }
+  .recent-id {
+    font-family: monospace; font-size: .8rem;
+    color: var(--gold2); margin-left: .6rem;
+    background: rgba(212,175,55,.1); padding: .15rem .4rem; border-radius: 4px;
+  }
+
   /* ── Back link ──────────────────────────────────────────────────── */
   .back-link {
     display: inline-flex; align-items: center; gap: .3rem;
@@ -256,17 +271,40 @@
           <input id="ev-date" type="date"/>
         </div>
       </div>
+      <div class="field">
+        <label>Admin PIN (you'll need this to access your dashboard)</label>
+        <input id="ev-pin" type="password" placeholder="e.g. 1234" maxlength="20"/>
+      </div>
       <button class="btn btn-gold" id="btn-create-event">🎄 Create Event</button>
     </div>
 
-    <div class="card mt1">
-      <h2>🔍 Join an Event</h2>
-      <div class="field">
-        <label>Event ID or Reveal Token</label>
-        <input id="join-input" type="text" placeholder="Event ID (e.g. 3F7A2C) or your reveal token"/>
-      </div>
-      <button class="btn btn-ghost" id="btn-join">Enter →</button>
+    <div id="recent-section" class="card mt1 hidden">
+      <h2>📋 Your Events</h2>
+      <p style="color:#a0c8a0;font-size:.95rem;margin-bottom:1rem;font-style:italic;">Events you've created or visited on this device</p>
+      <div id="recent-events"></div>
     </div>
+
+    <div class="card mt1">
+  <h2>🔍 Access Your Dashboard</h2>
+  <div class="field">
+    <label>Event ID</label>
+    <input id="join-input" type="text" placeholder="e.g. 7DD506B7"/>
+  </div>
+  <div class="field">
+    <label>Admin PIN</label>
+    <input id="join-pin" type="password" placeholder="Your PIN"/>
+  </div>
+  <button class="btn btn-ghost" id="btn-join">Open Dashboard →</button>
+</div>
+
+  <div class="card mt1">
+    <h2>🎁 Participant? Enter your token</h2>
+    <div class="field">
+      <label>Reveal Token</label>
+      <input id="token-input" type="text" placeholder="Paste your token here"/>
+    </div>
+    <button class="btn btn-ghost" id="btn-token">See My Assignment →</button>
+  </div>
   </div>
 
   <!-- ── EVENT DASHBOARD VIEW ── -->
@@ -338,7 +376,21 @@
       <div id="reveal-error" class="hidden" style="text-align:center;padding:2rem;color:#e08080;"></div>
     </div>
   </div>
-
+<!-- PIN Modal -->
+<div id="pin-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;">
+  <div class="card" style="width:100%;max-width:380px;margin:1rem;">
+    <h2>🔐 Enter Admin PIN</h2>
+    <p style="color:#a0c8a0;font-size:.95rem;margin-bottom:1rem;">Enter the PIN you set when creating this event.</p>
+    <div class="field">
+      <input id="modal-pin" type="password" placeholder="Your PIN" maxlength="20"/>
+    </div>
+    <div style="display:flex;gap:.8rem;margin-top:.5rem;">
+      <button class="btn btn-gold" id="modal-confirm">Confirm</button>
+      <button class="btn btn-ghost" id="modal-cancel">Cancel</button>
+    </div>
+    <p id="modal-error" style="color:#e08080;margin-top:.8rem;font-size:.95rem;"></p>
+  </div>
+</div>
 </div>
 
 <div id="toast"></div>
@@ -395,6 +447,8 @@ function showHome() {
   hide('view-event'); hide('view-reveal'); show('view-home');
 }
 function showEvent(id) {
+  const pin = sessionStorage.getItem(`pin_${id}`);
+  if(!pin){ promptPin(id); return; }
   hide('view-home'); hide('view-reveal'); show('view-event');
   loadEvent(id);
 }
@@ -432,25 +486,35 @@ document.getElementById('btn-create-event').addEventListener('click', async()=>{
   const name = document.getElementById('ev-name').value.trim();
   const budget = parseFloat(document.getElementById('ev-budget').value)||0;
   const event_date = document.getElementById('ev-date').value||null;
+  const admin_pin = document.getElementById('ev-pin').value.trim();
   if(!name){ toast('Please enter an event name',true); return; }
+  if(!admin_pin){ toast('Please set a PIN',true); return; }
   try{
-    const ev = await api('POST','/events',{name,budget,event_date});
+    const ev = await api('POST','/events',{name,budget,event_date,admin_pin});
     toast('Event created! 🎄');
+    saveRecentEvent(ev.id, ev.name);
+    sessionStorage.setItem(`pin_${ev.id}`, admin_pin);
     location.hash = `#event/${ev.id}`;
   } catch(e){ toast(e.message,true); }
 });
 
-document.getElementById('btn-join').addEventListener('click', ()=>{
-  const v = document.getElementById('join-input').value.trim();
-  if(!v){ toast('Enter an event ID or token',true); return; }
-  // Heuristic: tokens are long, event IDs are 8 chars alphanumeric
-  if(v.length <= 10){
-    location.hash = `#event/${v.toUpperCase()}`;
-  } else {
-    location.hash = `#reveal/${v}`;
-  }
+document.getElementById('btn-join').addEventListener('click', async ()=>{
+  const id  = document.getElementById('join-input').value.trim().toUpperCase();
+  const pin = document.getElementById('join-pin').value.trim();
+  if(!id){  toast('Enter your Event ID', true); return; }
+  if(!pin){ toast('Enter your PIN', true); return; }
+  try{
+    await api('POST', `/events/${id}/verify`, { admin_pin: pin });
+    sessionStorage.setItem(`pin_${id}`, pin);
+    saveRecentEvent(id, id); // name will update once dashboard loads
+    location.hash = `#event/${id}`;
+  } catch(e){ toast(e.message, true); }
 });
-
+document.getElementById('btn-token').addEventListener('click', ()=>{
+  const v = document.getElementById('token-input').value.trim();
+  if(!v){ toast('Enter your token', true); return; }
+  location.hash = `#reveal/${v}`;
+});
 document.getElementById('join-input').addEventListener('keydown', e=>{
   if(e.key==='Enter') document.getElementById('btn-join').click();
 });
@@ -472,6 +536,7 @@ async function loadEvent(id){
 }
 
 function renderEvent(ev){
+  saveRecentEvent(ev.id, ev.name);
   document.getElementById('ev-title').textContent = `🎅 ${ev.name}`;
   let meta = `Event ID: <strong style="color:var(--gold);letter-spacing:.05em">${ev.id}</strong>`;
   if(ev.budget) meta += ` &nbsp;·&nbsp; Budget: <strong>$${ev.budget.toFixed(2)}</strong>`;
@@ -629,10 +694,90 @@ document.getElementById('btn-save-wishlist').addEventListener('click', async()=>
   }catch(e){ toast(e.message,true); }
 });
 
+// ── Recent Events (localStorage) ──────────────────────────────────────────────
+function saveRecentEvent(id, name){
+  let list = getRecentEvents();
+  list = list.filter(e => e.id !== id); // remove duplicate
+  list.unshift({ id, name, ts: Date.now() });
+  list = list.slice(0, 8); // keep last 8
+  localStorage.setItem('santa_recent', JSON.stringify(list));
+  renderRecentEvents();
+}
+
+function getRecentEvents(){
+  try { return JSON.parse(localStorage.getItem('santa_recent') || '[]'); }
+  catch { return []; }
+}
+
+function renderRecentEvents(){
+  const list = getRecentEvents();
+  const container = document.getElementById('recent-events');
+  const section   = document.getElementById('recent-section');
+  if(!list.length){ section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  container.innerHTML = '';
+  list.forEach(ev => {
+    const div = document.createElement('div');
+    div.className = 'recent-card';
+    div.innerHTML = `
+      <span>
+        <span style="font-size:1rem;">🎄</span>
+        <span class="recent-name">${esc(ev.name)}</span>
+        <span class="recent-id">${esc(ev.id)}</span>
+      </span>
+      <span style="display:flex;gap:.5rem;align-items:center;">
+        <button class="btn btn-ghost btn-sm" data-open="${esc(ev.id)}">Open →</button>
+        <button class="btn btn-sm" style="background:transparent;color:#666;border:none;font-size:1rem;cursor:pointer;" data-remove="${esc(ev.id)}" title="Remove from list">✕</button>
+      </span>`;
+    container.appendChild(div);
+  });
+
+  container.querySelectorAll('[data-open]').forEach(btn => {
+    btn.addEventListener('click', () => { promptPin(btn.dataset.open); });
+  });
+  container.querySelectorAll('[data-remove]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      let l = getRecentEvents().filter(e => e.id !== btn.dataset.remove);
+      localStorage.setItem('santa_recent', JSON.stringify(l));
+      renderRecentEvents();
+    });
+  });
+}
+
+// ── PIN Modal ─────────────────────────────────────────────────────────────────
+function promptPin(eventId){
+  const modal = document.getElementById('pin-modal');
+  const input = document.getElementById('modal-pin');
+  const err   = document.getElementById('modal-error');
+  input.value = ''; err.textContent = '';
+  modal.classList.remove('hidden');
+  input.focus();
+
+  const confirm = async () => {
+    const pin = input.value.trim();
+    if(!pin){ err.textContent = 'Please enter your PIN'; return; }
+    try{
+      await api('POST', `/events/${eventId}/verify`, { admin_pin: pin });
+      modal.classList.add('hidden');
+      // Store verified PIN in sessionStorage so dashboard actions work
+      sessionStorage.setItem(`pin_${eventId}`, pin);
+      location.hash = `#event/${eventId}`;
+    } catch(e){
+      err.textContent = e.message;
+      input.value=''; input.focus();
+    }
+  };
+
+  document.getElementById('modal-confirm').onclick = confirm;
+  document.getElementById('modal-cancel').onclick = () => modal.classList.add('hidden');
+  input.onkeydown = e => { if(e.key==='Enter') confirm(); };
+}
+
 // ── Utils ──────────────────────────────────────────────────────────────────────
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
+renderRecentEvents();
 route();
 </script>
 </body>

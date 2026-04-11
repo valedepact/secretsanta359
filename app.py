@@ -32,6 +32,7 @@ def init_db():
             name        TEXT NOT NULL,
             budget      REAL NOT NULL DEFAULT 0,
             event_date  TEXT,
+            admin_pin   TEXT NOT NULL DEFAULT '',
             is_assigned INTEGER NOT NULL DEFAULT 0,
             created_at  TEXT NOT NULL
         );
@@ -137,12 +138,15 @@ def create_event():
         return jsonify(error='Event name is required'), 400
     budget = float(data.get('budget') or 0)
     event_date = data.get('event_date') or None
+    admin_pin = (data.get('admin_pin') or '').strip()
+    if not admin_pin:
+        return jsonify(error='A PIN is required'), 400
     event_id = str(uuid.uuid4())[:8].upper()
     now = datetime.utcnow().isoformat()
     db = get_db()
     db.execute(
-        "INSERT INTO events (id, name, budget, event_date, is_assigned, created_at) VALUES (?,?,?,?,0,?)",
-        (event_id, name, budget, event_date, now)
+        "INSERT INTO events (id, name, budget, event_date, admin_pin, is_assigned, created_at) VALUES (?,?,?,?,?,0,?)",
+        (event_id, name, budget, event_date, admin_pin, now)
     )
     db.commit()
     return jsonify(id=event_id, name=name, budget=budget, event_date=event_date, is_assigned=False), 201
@@ -160,6 +164,18 @@ def get_event(event_id):
     event['participants'] = participants
     event['is_assigned'] = bool(event['is_assigned'])
     return jsonify(event)
+
+@app.route('/api/events/<event_id>/verify', methods=['POST'])
+def verify_pin(event_id):
+    db = get_db()
+    event = db.execute("SELECT admin_pin FROM events WHERE id=?", (event_id,)).fetchone()
+    if not event:
+        return jsonify(error='Event not found'), 404
+    data = request.get_json(force=True)
+    pin = (data.get('admin_pin') or '').strip()
+    if pin != event['admin_pin']:
+        return jsonify(error='Incorrect PIN'), 403
+    return jsonify(ok=True)
 
 # ── API: Participants ─────────────────────────────────────────────────────────
 
