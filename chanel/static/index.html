@@ -376,6 +376,23 @@
       <div id="reveal-error" class="hidden" style="text-align:center;padding:2rem;color:#e08080;"></div>
     </div>
   </div>
+<!-- Event Created Modal -->
+<div id="event-created-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;display:flex;align-items:center;justify-content:center;">
+  <div class="card" style="width:100%;max-width:420px;margin:1rem;text-align:center;">
+    <div style="font-size:3rem;margin-bottom:.5rem;">🎄</div>
+    <h2 style="margin-bottom:.5rem;">Event Created!</h2>
+    <p style="color:#a0c8a0;margin-bottom:1.2rem;font-size:.95rem;">Save your Event ID — you'll need it along with your PIN to access the dashboard later.</p>
+    <div style="background:rgba(212,175,55,.12);border:2px dashed rgba(212,175,55,.4);border-radius:10px;padding:1rem;margin-bottom:1rem;">
+      <p style="color:#a0c8a0;font-size:.85rem;margin-bottom:.4rem;">Your Event ID</p>
+      <div id="created-event-id" style="font-family:monospace;font-size:2rem;font-weight:bold;color:var(--gold);letter-spacing:.15em;"></div>
+    </div>
+    <div style="display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;">
+      <button class="btn btn-gold" id="btn-copy-event-id">📋 Copy Event ID</button>
+      <button class="btn btn-ghost" id="btn-copy-event-link">🔗 Copy Link</button>
+    </div>
+    <button class="btn btn-red" id="btn-goto-dashboard" style="margin-top:1rem;width:100%;">Go to Dashboard →</button>
+  </div>
+</div>
 <!-- PIN Modal -->
 <div id="pin-modal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;">
   <div class="card" style="width:100%;max-width:380px;margin:1rem;">
@@ -491,10 +508,9 @@ document.getElementById('btn-create-event').addEventListener('click', async()=>{
   if(!admin_pin){ toast('Please set a PIN',true); return; }
   try{
     const ev = await api('POST','/events',{name,budget,event_date,admin_pin});
-    toast('Event created! 🎄');
     saveRecentEvent(ev.id, ev.name);
     sessionStorage.setItem(`pin_${ev.id}`, admin_pin);
-    location.hash = `#event/${ev.id}`;
+    showEventCreatedModal(ev.id);
   } catch(e){ toast(e.message,true); }
 });
 
@@ -596,7 +612,8 @@ function renderParticipants(list, assigned, eventId){
     </span>
     <span style="display:flex;align-items:center;gap:.5rem;">
       ${assigned && p.token
-        ? `<span class="token-chip" title="Click to copy token" data-token="${p.token}">${p.token.slice(0,10)}…</span>`
+        ? `<span class="token-chip" title="Click to copy token" data-token="${p.token}">${p.token.slice(0,10)}…</span>
+   <button class="btn btn-ghost btn-sm copy-link-btn" data-token="${p.token}" title="Copy reveal link">🔗</button>`
         : ''}
       ${!assigned
         ? `<button class="btn btn-ghost btn-sm" data-del="${p.id}">✕</button>`
@@ -612,12 +629,13 @@ ul.querySelectorAll('.token-chip').forEach(chip=>{
   });
 });
 
-  // Token copy
-  ul.querySelectorAll('.token-chip').forEach(chip=>{
-    chip.addEventListener('click',()=>{
-      navigator.clipboard.writeText(chip.dataset.token).then(()=>toast('Token copied! 📋'));
-    });
+ul.querySelectorAll('.copy-link-btn').forEach(btn=>{
+  btn.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    const link = `${location.origin}/#reveal/${btn.dataset.token}`;
+    navigator.clipboard.writeText(link).then(()=>toast('Reveal link copied! 🔗'));
   });
+});
 
   // Delete
   ul.querySelectorAll('[data-del]').forEach(btn=>{
@@ -693,6 +711,26 @@ document.getElementById('btn-save-wishlist').addEventListener('click', async()=>
     toast('Wishlist saved! 💌');
   }catch(e){ toast(e.message,true); }
 });
+
+// ── Event Created Modal ───────────────────────────────────────────────────────
+function showEventCreatedModal(eventId){
+  document.getElementById('created-event-id').textContent = eventId;
+  document.getElementById('event-created-modal').classList.remove('hidden');
+
+  document.getElementById('btn-copy-event-id').onclick = () => {
+    navigator.clipboard.writeText(eventId).then(() => toast('Event ID copied! 📋'));
+  };
+
+  document.getElementById('btn-copy-event-link').onclick = () => {
+    const link = `${location.origin}/#event/${eventId}`;
+    navigator.clipboard.writeText(link).then(() => toast('Link copied! 🔗'));
+  };
+
+  document.getElementById('btn-goto-dashboard').onclick = () => {
+    document.getElementById('event-created-modal').classList.add('hidden');
+    location.hash = `#event/${eventId}`;
+  };
+}
 
 // ── Recent Events (localStorage) ──────────────────────────────────────────────
 function saveRecentEvent(id, name){

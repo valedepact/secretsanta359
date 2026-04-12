@@ -1,47 +1,26 @@
 import os
 import uuid
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, send_from_directory
 from supabase import create_client, Client
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-SUPABASE_URL = os.environ.get('SUPABASE_URL', 'YOUR_SUPABASE_URL_HERE')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'YOUR_SUPABASE_ANON_KEY_HERE')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://mebvnpoynqbuoqlzzvvw.supabase.co')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lYnZucG95bnFidW9xbHp6dnZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4NTU2MTYsImV4cCI6MjA5MTQzMTYxNn0.igqg0gkS1kLIpc-9q8FatGmCGyQBDrePrwlPbQjRNP0')
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def row_to_dict(row):
-    return dict(row) if row else None
-
 def gender_aware_assign(participants):
-    """
-    Assign givers to receivers preferring cross-gender pairs.
-    Priority: male->female and female->male first.
-    Same-gender pairs only used when cross-gender is exhausted.
-    Everyone must be assigned exactly one person (no self-assignment).
-    """
-    import random
-
-    ids     = [p['id']     for p in participants]
+    ids     = [p['id'] for p in participants]
     genders = {p['id']: p['gender'] for p in participants}
 
-    males   = [p['id'] for p in participants if p['gender'] == 'male']
-    females = [p['id'] for p in participants if p['gender'] == 'female']
-    others  = [p['id'] for p in participants if p['gender'] == 'unspecified']
-
     for _ in range(2000):
-        assignment = {}  # giver -> receiver
+        assignment = {}
 
-        givers    = list(ids)
-        receivers = list(ids)
-        secrets.SystemRandom().shuffle(givers)
-        secrets.SystemRandom().shuffle(receivers)
-
-        # Build preference order: cross-gender pairs first
         def preferred_receivers(giver_id, remaining):
             g = genders[giver_id]
             if g == 'male':
@@ -57,6 +36,8 @@ def gender_aware_assign(participants):
             secrets.SystemRandom().shuffle(same)
             return cross + same
 
+        givers = list(ids)
+        secrets.SystemRandom().shuffle(givers)
         remaining = list(ids)
         secrets.SystemRandom().shuffle(remaining)
         success = True
@@ -73,7 +54,8 @@ def gender_aware_assign(participants):
         if success and len(assignment) == len(ids):
             return assignment
 
-    return None  # extremely unlikely
+    return None
+
 # ── Routes: Serve Frontend ────────────────────────────────────────────────────
 
 @app.route('/')
@@ -96,44 +78,46 @@ def create_event():
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify(error='Event name is required'), 400
-    budget = float(data.get('budget') or 0)
-    event_date = data.get('event_date') or None
     admin_pin = (data.get('admin_pin') or '').strip()
     if not admin_pin:
         return jsonify(error='A PIN is required'), 400
+    budget = float(data.get('budget') or 0)
+    event_date = data.get('event_date') or None
     event_id = str(uuid.uuid4())[:8].upper()
-    now = datetime.utcnow().isoformat()
-    db = get_db()
-    db.execute(
-        "INSERT INTO events (id, name, budget, event_date, admin_pin, is_assigned, created_at) VALUES (?,?,?,?,?,0,?)",
-        (event_id, name, budget, event_date, admin_pin, now)
-    )
-    db.commit()
-    return jsonify(id=event_id, name=name, budget=budget, event_date=event_date, is_assigned=False), 201
+    now = datetime.now(timezone.utc).isoformat()
+
+    sb.table('events').insert({
+        'id': event_id, 'name': name, 'budget': budget,
+        'event_date': event_date, 'admin_pin': admin_pin,
+        'is_assigned': 0, 'created_at': now
+    }).execute()
+
+    return jsonify(id=event_id, name=name, budget=budget,
+                   event_date=event_date, is_assigned=False), 201
 
 @app.route('/api/events/<event_id>', methods=['GET'])
 def get_event(event_id):
-    db = get_db()
-    event = row_to_dict(db.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone())
-    if not event:
+    res = sb.table('events').select('*').eq('id', event_id).execute()
+    if not res.data:
         return jsonify(error='Event not found'), 404
-    participants = [row_to_dict(r) for r in db.execute(
-        "SELECT id, name, email, gender, token, wishlist FROM participants WHERE event_id=? ORDER BY rowid",
-        (event_id,)
-    ).fetchall()]
-    event['participants'] = participants
+    event = res.data[0]
+
+    pres = sb.table('participants').select(
+        'id, name, email, gender, token, wishlist'
+    ).eq('event_id', event_id).execute()
+
+    event['participants'] = pres.data
     event['is_assigned'] = bool(event['is_assigned'])
     return jsonify(event)
 
 @app.route('/api/events/<event_id>/verify', methods=['POST'])
 def verify_pin(event_id):
-    db = get_db()
-    event = db.execute("SELECT admin_pin FROM events WHERE id=?", (event_id,)).fetchone()
-    if not event:
+    res = sb.table('events').select('admin_pin').eq('id', event_id).execute()
+    if not res.data:
         return jsonify(error='Event not found'), 404
     data = request.get_json(force=True)
     pin = (data.get('admin_pin') or '').strip()
-    if pin != event['admin_pin']:
+    if pin != res.data[0]['admin_pin']:
         return jsonify(error='Incorrect PIN'), 403
     return jsonify(ok=True)
 
@@ -141,78 +125,86 @@ def verify_pin(event_id):
 
 @app.route('/api/events/<event_id>/participants', methods=['POST'])
 def add_participant(event_id):
-    db = get_db()
-    event = db.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
-    if not event:
+    res = sb.table('events').select('is_assigned').eq('id', event_id).execute()
+    if not res.data:
         return jsonify(error='Event not found'), 404
-    if event['is_assigned']:
+    if res.data[0]['is_assigned']:
         return jsonify(error='Assignments already made; cannot add participants'), 400
+
     data = request.get_json(force=True)
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify(error='Name is required'), 400
-    email = (data.get('email') or '').strip() or None
-    gender = (data.get('gender') or 'unspecified').strip()
+    email  = (data.get('email') or '').strip() or None
+    gender = (data.get('gender') or 'unspecified').strip().lower()
     if gender not in ('male', 'female', 'unspecified'):
         gender = 'unspecified'
-    pid = str(uuid.uuid4())
+    pid   = str(uuid.uuid4())
     token = secrets.token_urlsafe(16)
-    db.execute(
-    "INSERT INTO participants (id, event_id, name, email, gender, token) VALUES (?,?,?,?,?,?)",
-    (pid, event_id, name, email, gender, token)
-)
-    db.commit()
-    return jsonify(id=pid, name=name, email=email, token=token), 201
+
+    sb.table('participants').insert({
+        'id': pid, 'event_id': event_id, 'name': name,
+        'email': email, 'gender': gender, 'token': token
+    }).execute()
+
+    return jsonify(id=pid, name=name, email=email, gender=gender, token=token), 201
 
 @app.route('/api/events/<event_id>/participants/<pid>', methods=['DELETE'])
 def remove_participant(event_id, pid):
-    db = get_db()
-    event = db.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
-    if not event:
+    res = sb.table('events').select('is_assigned').eq('id', event_id).execute()
+    if not res.data:
         return jsonify(error='Event not found'), 404
-    if event['is_assigned']:
+    if res.data[0]['is_assigned']:
         return jsonify(error='Cannot remove after assignments made'), 400
-    db.execute("DELETE FROM participants WHERE id=? AND event_id=?", (pid, event_id))
-    db.commit()
+    sb.table('participants').delete().eq('id', pid).eq('event_id', event_id).execute()
     return jsonify(ok=True)
 
 # ── API: Assign ───────────────────────────────────────────────────────────────
 
 @app.route('/api/events/<event_id>/assign', methods=['POST'])
 def assign(event_id):
-    db = get_db()
-    event = db.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
-    if not event:
+    res = sb.table('events').select('is_assigned').eq('id', event_id).execute()
+    if not res.data:
         return jsonify(error='Event not found'), 404
-    if event['is_assigned']:
+    if res.data[0]['is_assigned']:
         return jsonify(error='Already assigned'), 400
-    rows = db.execute("SELECT id, gender FROM participants WHERE event_id=?", (event_id,)).fetchall()
-    participants = [dict(r) for r in rows]
+
+    pres = sb.table('participants').select('id, gender').eq('event_id', event_id).execute()
+    participants = pres.data
     if len(participants) < 3:
         return jsonify(error='Need at least 3 participants to assign'), 400
+
     assignment = gender_aware_assign(participants)
     if assignment is None:
         return jsonify(error='Could not generate valid assignment, try again'), 500
+
     for giver_id, receiver_id in assignment.items():
-        db.execute("UPDATE participants SET assigned_to_id=? WHERE id=?", (receiver_id, giver_id))
-    db.execute("UPDATE events SET is_assigned=1 WHERE id=?", (event_id,))
-    db.commit()
+        sb.table('participants').update(
+            {'assigned_to_id': receiver_id}
+        ).eq('id', giver_id).execute()
+
+    sb.table('events').update({'is_assigned': 1}).eq('id', event_id).execute()
     return jsonify(ok=True, message='Assignments made! Share tokens with participants.')
 
 # ── API: Reveal ───────────────────────────────────────────────────────────────
 
 @app.route('/api/reveal/<token>', methods=['GET'])
 def reveal(token):
-    db = get_db()
-    giver = row_to_dict(db.execute("SELECT * FROM participants WHERE token=?", (token,)).fetchone())
-    if not giver:
+    res = sb.table('participants').select('*').eq('token', token).execute()
+    if not res.data:
         return jsonify(error='Invalid token'), 404
-    event = row_to_dict(db.execute("SELECT * FROM events WHERE id=?", (giver['event_id'],)).fetchone())
+    giver = res.data[0]
+
+    eres = sb.table('events').select('*').eq('id', giver['event_id']).execute()
+    event = eres.data[0]
     if not event['is_assigned']:
         return jsonify(error='Assignments not yet made'), 400
-    receiver = row_to_dict(db.execute(
-        "SELECT name, wishlist FROM participants WHERE id=?", (giver['assigned_to_id'],)
-    ).fetchone())
+
+    rres = sb.table('participants').select(
+        'name, wishlist'
+    ).eq('id', giver['assigned_to_id']).execute()
+    receiver = rres.data[0]
+
     return jsonify(
         giver_name=giver['name'],
         receiver_name=receiver['name'],
@@ -226,14 +218,14 @@ def reveal(token):
 
 @app.route('/api/reveal/<token>/wishlist', methods=['POST'])
 def update_wishlist(token):
-    db = get_db()
-    p = db.execute("SELECT id FROM participants WHERE token=?", (token,)).fetchone()
-    if not p:
+    res = sb.table('participants').select('id').eq('token', token).execute()
+    if not res.data:
         return jsonify(error='Invalid token'), 404
     data = request.get_json(force=True)
     wishlist = (data.get('wishlist') or '').strip()
-    db.execute("UPDATE participants SET wishlist=? WHERE id=?", (wishlist, p['id']))
-    db.commit()
+    sb.table('participants').update(
+        {'wishlist': wishlist}
+    ).eq('id', res.data[0]['id']).execute()
     return jsonify(ok=True)
 
 if __name__ == '__main__':
