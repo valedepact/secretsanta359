@@ -10,6 +10,7 @@ import 'pages/participant_event_page.dart';
 import 'pages/sign_in_page.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
+import 'utils/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,7 +71,7 @@ class SecretSantaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Secret Santa Organizer',
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: Colors.red)),
+      theme: AppTheme.light,
       routerConfig: _router,
     );
   }

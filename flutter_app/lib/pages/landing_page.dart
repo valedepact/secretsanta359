@@ -17,7 +17,7 @@ class LandingPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.card_giftcard, size: 72, color: Colors.red),
+                  Icon(Icons.card_giftcard, size: 72, color: Theme.of(context).colorScheme.secondary),
                   const SizedBox(height: 16),
                   Text(
                     'Secret Santa Organizer',
@@ -81,7 +81,7 @@ class _FeatureRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, color: Colors.red),
+          Icon(icon, color: Theme.of(context).colorScheme.secondary),
           const SizedBox(width: 12),
           Expanded(child: Text(text)),
         ],

@@ -42,19 +42,37 @@ class _InstallAppButtonState extends State<InstallAppButton> {
   @override
   Widget build(BuildContext context) {
     if (_canInstall) {
-      return OutlinedButton.icon(
-        onPressed: () => promptPwaInstall(),
-        icon: const Icon(Icons.install_mobile),
-        label: const Text('Install App'),
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () => promptPwaInstall(),
+            icon: const Icon(Icons.install_mobile),
+            label: const Text('Install App'),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Optional - it already works fully in your browser.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
       );
     }
     if (isLikelyIosSafari()) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          'On iPhone/iPad: tap Share, then "Add to Home Screen" to install.',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-          textAlign: TextAlign.center,
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.ios_share, size: 16, color: Theme.of(context).colorScheme.secondary),
+            const SizedBox(width: 8),
+            const Flexible(
+              child: Text(
+                'No app to download on iPhone - tap Share, then "Add to Home Screen".',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
+          ],
         ),
       );
     }

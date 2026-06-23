@@ -503,7 +503,7 @@ class _RevealViewState extends State<_RevealView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.card_giftcard, size: 64, color: Colors.red),
+                  Icon(Icons.card_giftcard, size: 64, color: Theme.of(context).colorScheme.secondary),
                   const SizedBox(height: 16),
                   Text('Hi ${reveal.participantName}!', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
