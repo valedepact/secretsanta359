@@ -64,6 +64,16 @@ supabase/
   README.md                          backend setup steps
 ```
 
+## Known dependency pin
+
+`supabase_flutter` is pinned to exactly `2.14.2` in `pubspec.yaml` (not a
+caret range). Version `2.15.0` has a web-only regression that throws `Null
+check operator used on a null value` during `Supabase.initialize()`,
+producing a blank page on every browser with no visible error to the user.
+Verified by bisecting versions with a throwaway Flutter app - 2.8.4 through
+2.14.2 all boot cleanly on web, 2.15.0 does not. Don't `flutter pub upgrade`
+this package past 2.14.2 until that regression is confirmed fixed upstream.
+
 ## Local setup
 
 1. Install the Flutter SDK (stable channel) and enable web support:
