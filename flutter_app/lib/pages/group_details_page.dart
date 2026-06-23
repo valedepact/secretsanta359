@@ -57,6 +57,34 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
+  Future<void> _removeParticipant(Participant participant) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove participant?'),
+        content: Text('${participant.name} will be removed from this group.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ParticipantService.remove(participant.id);
+      await _load();
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
   Future<void> _draw() async {
     setState(() {
       _isDrawing = true;
@@ -140,7 +168,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                       ),
                       trailing: p.hasBeenAssigned
                           ? const Icon(Icons.check_circle, color: Colors.green)
-                          : null,
+                          : IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: 'Remove participant',
+                              onPressed: () => _removeParticipant(p),
+                            ),
                     ),
                   )),
             const SizedBox(height: 24),

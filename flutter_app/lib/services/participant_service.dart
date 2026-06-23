@@ -59,6 +59,14 @@ class ParticipantService {
     return AssignmentReveal.fromJson(rows.first as Map<String, dynamic>);
   }
 
+  /// Organizer-only: removes a participant from their own group. Only
+  /// allowed before a draw - the assigned_to_id foreign key has no cascade,
+  /// so deleting a participant who's already part of an assignment chain
+  /// would fail; the UI only offers this while the group is still a draft.
+  static Future<void> remove(String participantId) async {
+    await _client.from('participants').delete().eq('id', participantId);
+  }
+
   /// Organizer-only: runs the draw client-side, then persists every
   /// assignment via the RLS-protected participants table.
   static Future<void> drawAndAssign(String groupId) async {
