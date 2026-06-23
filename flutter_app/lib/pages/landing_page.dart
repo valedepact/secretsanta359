@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/install_app_button.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
@@ -56,6 +57,8 @@ class LandingPage extends StatelessWidget {
                     onPressed: () => context.go('/join'),
                     child: const Text('I have an invite link or reveal code'),
                   ),
+                  const SizedBox(height: 16),
+                  const InstallAppButton(),
                 ],
               ),
             ),

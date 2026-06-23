@@ -18,19 +18,40 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Organize a Secret Santa gift exchange and reveal who you're gifting.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="secret_santa_organizer">
+  <meta name="apple-mobile-web-app-title" content="Secret Santa">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>secret_santa_organizer</title>
+  <title>Secret Santa Organizer</title>
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    // Capture the browser's native "Add to Home Screen" prompt so the
+    // in-app Install button can trigger it on demand instead of relying
+    // on the browser's own (often hidden) install affordance.
+    window.deferredPwaInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      window.deferredPwaInstallPrompt = event;
+    });
+    window.canInstallPwa = function () {
+      return window.deferredPwaInstallPrompt !== null;
+    };
+    window.promptPwaInstall = async function () {
+      if (!window.deferredPwaInstallPrompt) return false;
+      window.deferredPwaInstallPrompt.prompt();
+      const choice = await window.deferredPwaInstallPrompt.userChoice;
+      window.deferredPwaInstallPrompt = null;
+      return choice.outcome === 'accepted';
+    };
+  </script>
 </head>
 <body>
   <!--

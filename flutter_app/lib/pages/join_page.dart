@@ -5,6 +5,7 @@ import '../models/participant.dart';
 import '../models/public_group_info.dart';
 import '../services/group_service.dart';
 import '../services/participant_service.dart';
+import '../widgets/install_app_button.dart';
 
 class JoinPage extends StatefulWidget {
   final String? shareCode;
@@ -348,6 +349,8 @@ class _RevealViewState extends State<_RevealView> {
                     reveal.assignedToName ?? 'Not drawn yet - check back later.',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
+                  const SizedBox(height: 24),
+                  const InstallAppButton(),
                 ],
               ),
             ),

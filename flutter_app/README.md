@@ -20,6 +20,12 @@ reveal code.
 - **Email notifications**: after a draw, participants who gave an email get
   their reveal link sent via a Supabase Edge Function over Gmail SMTP
   (fire-and-forget — a failed send never blocks the draw)
+- **Installable PWA**: anyone who taps an invite or reveal link opens the app
+  straight in their browser - no install required. On Chrome/Edge/Android an
+  in-app "Install App" button (`lib/widgets/install_app_button.dart`) appears
+  once the browser's install prompt becomes available; on iOS Safari (which
+  has no install prompt API) a manual "Add to Home Screen" hint is shown
+  instead.
 
 ## Architecture
 
@@ -95,6 +101,26 @@ flutter test
 flutter build web --release      # static site in build/web
 flutter build apk --release      # Android APK in build/app/outputs
 ```
+
+## Deployment
+
+The web build is hosted on Netlify: **https://secretsanta359.netlify.app**
+
+`web/_redirects` (copied into every `build/web` output) tells Netlify to
+serve `index.html` for every path so go_router's client-side routes
+(`/join`, `/group/:id`, etc.) work on direct load and refresh, not just
+in-app navigation.
+
+To redeploy after changes:
+
+```bash
+flutter build web --release
+netlify deploy --prod --dir=build/web
+```
+
+If the deployed domain ever changes, update the `APP_BASE_URL` secret used
+by the reveal-email function (see `supabase/README.md`) and redeploy it,
+otherwise emailed reveal links will point at the old domain.
 
 ## Relationship to `chanel/`
 

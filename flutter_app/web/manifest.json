@@ -1,11 +1,11 @@
 {
-    "name": "secret_santa_organizer",
-    "short_name": "secret_santa_organizer",
+    "name": "Secret Santa Organizer",
+    "short_name": "Secret Santa",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#B71C1C",
+    "theme_color": "#B71C1C",
+    "description": "Organize a Secret Santa gift exchange and reveal who you're gifting.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

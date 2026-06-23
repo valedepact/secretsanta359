@@ -49,3 +49,6 @@ lib/utils/env.dart
 
 # Supabase CLI local link metadata
 supabase/.temp/
+
+# Netlify CLI local link metadata
+.netlify/
