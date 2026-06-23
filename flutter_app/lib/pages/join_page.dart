@@ -8,6 +8,7 @@ import '../services/email_service.dart';
 import '../services/group_service.dart';
 import '../services/participant_service.dart';
 import '../widgets/install_app_button.dart';
+import '../utils/friendly_error.dart';
 
 class JoinPage extends StatefulWidget {
   final String? shareCode;
@@ -163,7 +164,7 @@ class _JoinFormState extends State<_JoinForm> {
     } catch (e) {
       setState(() {
         _groupInfo = info;
-        _error = e.toString();
+        _error = friendlyError(e);
       });
     } finally {
       setState(() => _isLoading = false);
@@ -253,7 +254,7 @@ class _InlineSignInState extends State<_InlineSignIn> {
       }
       widget.onAuthenticated();
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -382,7 +383,7 @@ class _ProfileFormState extends State<_ProfileForm> {
       EmailService.notifyOrganizerOfJoin(widget.group.id, _nameController.text.trim());
       widget.onJoined(widget.group.id);
     } catch (e) {
-      widget.onError(e.toString());
+      widget.onError(friendlyError(e));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

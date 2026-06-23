@@ -4,6 +4,7 @@ import '../models/group.dart';
 import '../models/participant.dart';
 import '../services/group_service.dart';
 import '../services/participant_service.dart';
+import '../utils/friendly_error.dart';
 
 /// What a signed-in participant sees for an event they've joined: group
 /// info, their own assignment (once drawn), and a wishlist editor.
@@ -48,7 +49,7 @@ class _ParticipantEventPageState extends State<ParticipantEventPage> {
         _wishlistController.text = me?.wishlist ?? '';
       });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -68,7 +69,7 @@ class _ParticipantEventPageState extends State<ParticipantEventPage> {
         );
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       setState(() => _isSavingWishlist = false);
     }

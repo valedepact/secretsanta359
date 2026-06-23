@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/group_service.dart';
+import '../utils/friendly_error.dart';
 
 class CreateGroupPage extends StatefulWidget {
   const CreateGroupPage({super.key});
@@ -57,7 +58,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
       );
       if (mounted) context.go('/group/${group.id}');
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

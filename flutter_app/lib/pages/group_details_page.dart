@@ -8,6 +8,7 @@ import '../services/email_service.dart';
 import '../services/group_service.dart';
 import '../services/participant_service.dart';
 import '../utils/app_links.dart';
+import '../utils/friendly_error.dart';
 
 class GroupDetailsPage extends StatefulWidget {
   final String groupId;
@@ -41,7 +42,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
         _participants = participants;
       });
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -135,7 +136,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       );
       await _load();
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     }
   }
 
@@ -163,7 +164,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       await ParticipantService.remove(participant.id);
       await _load();
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     }
   }
 
@@ -179,7 +180,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       EmailService.sendRevealEmails(widget.groupId);
       await _load();
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = friendlyError(e));
     } finally {
       setState(() => _isDrawing = false);
     }
