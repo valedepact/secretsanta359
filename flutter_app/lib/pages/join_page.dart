@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/participant.dart';
 import '../models/public_group_info.dart';
 import '../services/auth_service.dart';
+import '../services/email_service.dart';
 import '../services/group_service.dart';
 import '../services/participant_service.dart';
 import '../widgets/install_app_button.dart';
@@ -378,6 +379,7 @@ class _ProfileFormState extends State<_ProfileForm> {
         email: AuthService.currentUser?.email,
         wishlist: _wishlistController.text.trim().isEmpty ? null : _wishlistController.text.trim(),
       );
+      EmailService.notifyOrganizerOfJoin(widget.group.id, _nameController.text.trim());
       widget.onJoined(widget.group.id);
     } catch (e) {
       widget.onError(e.toString());

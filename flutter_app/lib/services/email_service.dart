@@ -12,4 +12,17 @@ class EmailService {
       // Intentionally ignored - email delivery must never block the draw.
     }
   }
+
+  /// Fire-and-forget call to notify the organizer that someone joined.
+  /// Failures are swallowed - a notification email must never block joining.
+  static Future<void> notifyOrganizerOfJoin(String groupId, String participantName) async {
+    try {
+      await SupabaseService.client.functions.invoke(
+        'notify-organizer-join',
+        body: {'group_id': groupId, 'participant_name': participantName},
+      );
+    } catch (_) {
+      // Intentionally ignored.
+    }
+  }
 }
