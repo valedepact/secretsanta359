@@ -33,8 +33,7 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) =>
-          AuthService.isSignedIn ? const DashboardPage() : const LandingPage(),
+      builder: (context, state) => const _RootGate(),
     ),
     GoRoute(
       path: '/sign-in',
@@ -91,5 +90,40 @@ class GoRouterRefreshStream extends ChangeNotifier {
   void dispose() {
     _subscription.cancel();
     super.dispose();
+  }
+}
+
+/// The "/" route shows the dashboard when signed in, landing page otherwise.
+/// Listens to auth changes directly rather than relying on go_router to
+/// rebuild this route - since the path doesn't change on sign-out, the
+/// router's own refresh wouldn't otherwise re-invoke this builder, leaving
+/// the dashboard visible for a beat after the session actually clears.
+class _RootGate extends StatefulWidget {
+  const _RootGate();
+
+  @override
+  State<_RootGate> createState() => _RootGateState();
+}
+
+class _RootGateState extends State<_RootGate> {
+  late final dynamic _subscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription = AuthService.onAuthStateChange.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthService.isSignedIn ? const DashboardPage() : const LandingPage();
   }
 }
