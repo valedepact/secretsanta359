@@ -9,8 +9,8 @@
 //
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically by the platform.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { SmtpClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import nodemailer from "npm:nodemailer@6.9.16";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -57,12 +57,11 @@ Deno.serve(async (req) => {
     });
   }
 
-  const client = new SmtpClient();
-  await client.connectTLS({
-    hostname: "smtp.gmail.com",
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
     port: 465,
-    username: GMAIL_USER,
-    password: GMAIL_APP_PASSWORD,
+    secure: true,
+    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
   });
 
   const results: { email: string; sent: boolean }[] = [];
@@ -70,11 +69,10 @@ Deno.serve(async (req) => {
   for (const participant of participants ?? []) {
     const revealUrl = `${APP_BASE_URL}/join?reveal=${participant.reveal_code}`;
     try {
-      await client.send({
+      await transporter.sendMail({
         from: GMAIL_USER,
         to: participant.email,
         subject: `Names have been drawn for ${group.name}!`,
-        content: "auto",
         html: `
           <p>Hi ${participant.name},</p>
           <p>Names have been drawn for <strong>${group.name}</strong>.</p>
@@ -89,8 +87,6 @@ Deno.serve(async (req) => {
       results.push({ email: participant.email, sent: false });
     }
   }
-
-  await client.close();
 
   return new Response(JSON.stringify({ results }), {
     headers: { "Content-Type": "application/json" },

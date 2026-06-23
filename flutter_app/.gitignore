@@ -46,3 +46,6 @@ app.*.map.json
 
 # Local secrets - never commit
 lib/utils/env.dart
+
+# Supabase CLI local link metadata
+supabase/.temp/
