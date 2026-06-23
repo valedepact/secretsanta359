@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/group.dart';
 import '../models/participant.dart';
+import '../services/auth_service.dart';
 import '../services/email_service.dart';
 import '../services/group_service.dart';
 import '../services/participant_service.dart';
@@ -54,6 +55,86 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Invite link copied')),
       );
+    }
+  }
+
+  bool get _organizerIsParticipant {
+    final organizerEmail = AuthService.currentUser?.email;
+    if (organizerEmail == null) return false;
+    return _participants.any((p) => p.email == organizerEmail);
+  }
+
+  Future<void> _joinAsParticipant() async {
+    final nameController = TextEditingController();
+    final wishlistController = TextEditingController();
+    Gender gender = Gender.other;
+    final organizerEmail = AuthService.currentUser?.email;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Join as a participant'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Using your account email: $organizerEmail'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Your name'),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<Gender>(
+                initialValue: gender,
+                decoration: const InputDecoration(labelText: 'Gender'),
+                items: const [
+                  DropdownMenuItem(value: Gender.female, child: Text('Female')),
+                  DropdownMenuItem(value: Gender.male, child: Text('Male')),
+                  DropdownMenuItem(value: Gender.other, child: Text('Other / prefer not to say')),
+                ],
+                onChanged: (v) => setDialogState(() => gender = v ?? Gender.other),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: wishlistController,
+                decoration: const InputDecoration(labelText: 'Wishlist (optional)'),
+                maxLines: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Join'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+    if (nameController.text.trim().isEmpty) {
+      setState(() => _error = 'Name is required.');
+      return;
+    }
+
+    try {
+      await ParticipantService.join(
+        groupId: widget.groupId,
+        name: nameController.text.trim(),
+        gender: gender,
+        email: organizerEmail,
+        wishlist: wishlistController.text.trim().isEmpty ? null : wishlistController.text.trim(),
+      );
+      await _load();
+    } catch (e) {
+      setState(() => _error = e.toString());
     }
   }
 
@@ -175,6 +256,14 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                             ),
                     ),
                   )),
+            if (group.status == GroupStatus.draft && !_organizerIsParticipant) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _joinAsParticipant,
+                icon: const Icon(Icons.person_add),
+                label: const Text('Join as a participant too'),
+              ),
+            ],
             const SizedBox(height: 24),
             if (group.status == GroupStatus.draft)
               FilledButton(
