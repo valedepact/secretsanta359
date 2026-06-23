@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'pages/create_group_page.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/group_details_page.dart';
 import 'pages/join_page.dart';
 import 'pages/landing_page.dart';
+import 'pages/participant_event_page.dart';
 import 'pages/sign_in_page.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   await SupabaseService.initialize();
   runApp(const SecretSantaApp());
 }
@@ -45,6 +48,11 @@ final _router = GoRouter(
       path: '/group/:id',
       builder: (context, state) =>
           GroupDetailsPage(groupId: state.pathParameters['id']!),
+    ),
+    GoRoute(
+      path: '/event/:id',
+      builder: (context, state) =>
+          ParticipantEventPage(groupId: state.pathParameters['id']!),
     ),
     GoRoute(
       path: '/join',

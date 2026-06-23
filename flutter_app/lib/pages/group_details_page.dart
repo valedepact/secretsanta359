@@ -125,10 +125,11 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
 
     try {
-      await ParticipantService.join(
+      await ParticipantService.joinAsAuthenticatedUser(
         groupId: widget.groupId,
         name: nameController.text.trim(),
         gender: gender,
+        userId: AuthService.currentUser!.id,
         email: organizerEmail,
         wishlist: wishlistController.text.trim().isEmpty ? null : wishlistController.text.trim(),
       );

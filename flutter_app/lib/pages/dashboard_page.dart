@@ -13,16 +13,20 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  late Future<List<Group>> _groupsFuture;
+  late Future<List<Group>> _organizedFuture;
+  late Future<List<Group>> _joinedFuture;
 
   @override
   void initState() {
     super.initState();
-    _groupsFuture = GroupService.myGroups();
+    _refresh();
   }
 
   void _refresh() {
-    setState(() => _groupsFuture = GroupService.myGroups());
+    setState(() {
+      _organizedFuture = GroupService.myGroups();
+      _joinedFuture = GroupService.myParticipatingGroups();
+    });
   }
 
   @override
@@ -49,45 +53,84 @@ class _DashboardPageState extends State<DashboardPage> {
         icon: const Icon(Icons.add),
         label: const Text('New Group'),
       ),
-      body: FutureBuilder<List<Group>>(
-        future: _groupsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          final groups = snapshot.data ?? [];
-          if (groups.isEmpty) {
-            return const Center(
-              child: Text('No groups yet. Tap "New Group" to start one.'),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: groups.length,
-            itemBuilder: (context, index) {
-              final group = groups[index];
-              return Card(
-                child: ListTile(
-                  title: Text(group.name),
-                  subtitle: Text(
-                    '${DateFormat.yMMMd().format(group.eventDate)} - '
-                    '${group.budget.toStringAsFixed(0)} ${group.currency} - '
-                    '${groupStatusToString(group.status)}',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () async {
-                    await context.push('/group/${group.id}');
-                    _refresh();
-                  },
-                ),
-              );
-            },
-          );
-        },
+      body: RefreshIndicator(
+        onRefresh: () async => _refresh(),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Organizing', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            _GroupList(
+              future: _organizedFuture,
+              emptyText: 'No groups yet. Tap "New Group" to start one.',
+              onTap: (group) async {
+                await context.push('/group/${group.id}');
+                _refresh();
+              },
+            ),
+            const SizedBox(height: 24),
+            Text('Participating in', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            _GroupList(
+              future: _joinedFuture,
+              emptyText: 'You haven\'t joined any other groups yet.',
+              onTap: (group) async {
+                await context.push('/event/${group.id}');
+                _refresh();
+              },
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _GroupList extends StatelessWidget {
+  final Future<List<Group>> future;
+  final String emptyText;
+  final void Function(Group group) onTap;
+
+  const _GroupList({required this.future, required this.emptyText, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Group>>(
+      future: future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}', style: const TextStyle(color: Colors.red));
+        }
+        final groups = snapshot.data ?? [];
+        if (groups.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(emptyText),
+          );
+        }
+        return Column(
+          children: groups
+              .map((group) => Card(
+                    child: ListTile(
+                      title: Text(group.name),
+                      subtitle: Text(
+                        '${DateFormat.yMMMd().format(group.eventDate)} - '
+                        '${group.budget.toStringAsFixed(0)} ${group.currency} - '
+                        '${groupStatusToString(group.status)}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => onTap(group),
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }

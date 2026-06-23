@@ -33,6 +33,38 @@ class GroupService {
     return PublicGroupInfo.fromJson(rows.first as Map<String, dynamic>);
   }
 
+  /// Resolves a share code to a group id for an authenticated visitor about
+  /// to join - distinct from getPublicByShareCode because this is used once
+  /// we already know who they are and just need the id to join/view with.
+  static Future<String> getGroupIdByShareCode(String shareCode) async {
+    final id = await _client.rpc(
+      'get_group_id_by_share_code',
+      params: {'p_share_code': shareCode},
+    );
+    if (id == null) {
+      throw Exception('Group not found for this invite code.');
+    }
+    return id as String;
+  }
+
+  /// Groups the signed-in user has joined as a participant (not organized).
+  static Future<List<Group>> myParticipatingGroups() async {
+    final userId = _client.auth.currentUser!.id;
+    final participantRows = await _client
+        .from('participants')
+        .select('group_id')
+        .eq('user_id', userId);
+    final groupIds = participantRows.map((row) => row['group_id'] as String).toSet();
+    if (groupIds.isEmpty) return [];
+
+    final rows = await _client
+        .from('groups')
+        .select()
+        .inFilter('id', groupIds.toList())
+        .order('created_at', ascending: false);
+    return rows.map((row) => Group.fromJson(row)).toList();
+  }
+
   /// Full reveal of every assignment in a group, only available after the
   /// event date. Backed by a SECURITY DEFINER function that enforces the
   /// date check server-side.
