@@ -20,6 +20,7 @@ class ParticipantEventPage extends StatefulWidget {
 class _ParticipantEventPageState extends State<ParticipantEventPage> {
   Group? _group;
   Participant? _me;
+  Giftee? _giftee;
   bool _isLoading = true;
   bool _isSavingWishlist = false;
   String? _error;
@@ -43,9 +44,13 @@ class _ParticipantEventPageState extends State<ParticipantEventPage> {
     try {
       final group = await GroupService.getById(widget.groupId);
       final me = await ParticipantService.getMyParticipation(widget.groupId);
+      final giftee = me != null && me.hasBeenAssigned
+          ? await ParticipantService.getMyGiftee(widget.groupId)
+          : null;
       setState(() {
         _group = group;
         _me = me;
+        _giftee = giftee;
         _wishlistController.text = me?.wishlist ?? '';
       });
     } catch (e) {
@@ -131,6 +136,16 @@ class _ParticipantEventPageState extends State<ParticipantEventPage> {
                             : 'Names haven\'t been drawn yet - check back later.',
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
+                      if (me.hasBeenAssigned) ...[
+                        const SizedBox(height: 12),
+                        Text('Their wishlist', style: Theme.of(context).textTheme.titleSmall),
+                        const SizedBox(height: 4),
+                        Text(
+                          _giftee?.wishlist?.isNotEmpty == true
+                              ? _giftee!.wishlist!
+                              : 'They haven\'t added a wishlist yet.',
+                        ),
+                      ],
                     ],
                   ),
                 ),

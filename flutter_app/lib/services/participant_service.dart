@@ -90,6 +90,20 @@ class ParticipantService {
         .eq('id', participantId);
   }
 
+  /// Returns the name and current wishlist of the person the signed-in
+  /// user is assigned to gift, or null if they haven't been assigned yet.
+  /// Uses a SECURITY DEFINER RPC so a giver can read just their own
+  /// giftee's wishlist without a broad RLS grant on other participants'
+  /// rows.
+  static Future<Giftee?> getMyGiftee(String groupId) async {
+    final rows = await _client.rpc(
+      'get_my_giftee',
+      params: {'p_group_id': groupId},
+    );
+    if (rows == null || (rows as List).isEmpty) return null;
+    return Giftee.fromJson(rows.first as Map<String, dynamic>);
+  }
+
   /// Organizer-only: removes a participant from their own group. Only
   /// allowed before a draw - the assigned_to_id foreign key has no cascade,
   /// so deleting a participant who's already part of an assignment chain

@@ -64,3 +64,18 @@ class Participant {
 
   bool get hasBeenAssigned => assignedToId != null;
 }
+
+/// The person a participant is gifting, with their current wishlist.
+class Giftee {
+  final String name;
+  final String? wishlist;
+
+  Giftee({required this.name, this.wishlist});
+
+  factory Giftee.fromJson(Map<String, dynamic> json) {
+    return Giftee(
+      name: json['name'] as String,
+      wishlist: json['wishlist'] as String?,
+    );
+  }
+}
