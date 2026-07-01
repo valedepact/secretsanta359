@@ -1,0 +1,29 @@
+name: Flutter Tests
+
+on:
+  push:
+    branches: [morningstar1]
+  pull_request:
+    branches: [morningstar1]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: stable
+          channel: stable
+          cache: true
+
+      - name: Run tests
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test --reporter expanded
+        
