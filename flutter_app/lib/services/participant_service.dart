@@ -112,8 +112,9 @@ class ParticipantService {
     await _client.from('participants').delete().eq('id', participantId);
   }
 
-  /// Organizer-only: runs the draw client-side, then persists every
-  /// assignment via the RLS-protected participants table.
+  /// Organizer-only: computes the draw client-side then writes all
+  /// assignments atomically via a single server-side transaction (RPC).
+  /// A network interruption can no longer leave the group half-drawn.
   static Future<void> drawAndAssign(String groupId) async {
     final participants = await forGroup(groupId);
     final assignment = drawAssignments(participants);
@@ -124,13 +125,15 @@ class ParticipantService {
     }
     final byId = {for (final p in participants) p.id: p};
 
-    for (final entry in assignment.entries) {
-      final giverId = entry.key;
-      final recipient = byId[entry.value]!;
-      await _client.from('participants').update({
-        'assigned_to_id': recipient.id,
-        'assigned_to_name': recipient.name,
-      }).eq('id', giverId);
-    }
+    final payload = assignment.entries.map((e) => {
+      'giver_id': e.key,
+      'giftee_id': e.value,
+      'giftee_name': byId[e.value]!.name,
+    }).toList();
+
+    await _client.rpc('perform_draw', params: {
+      'p_group_id': groupId,
+      'p_assignments': payload,
+    });
   }
 }

@@ -47,11 +47,21 @@ Map<String, String>? _attemptCrossGenderDraw(
   final assignment = <String, String>{};
 
   if (shuffledMales.length == shuffledFemales.length && others.isEmpty) {
+    // Build two separate rotations so males gift females and vice versa,
+    // but use a random offset to avoid guaranteed mutual pairs when N==2.
+    final offset = shuffledMales.length == 1
+        ? 0
+        : 1 + random.nextInt(shuffledMales.length - 1);
     for (var i = 0; i < shuffledMales.length; i++) {
       assignment[shuffledMales[i].id] =
-          shuffledFemales[(i + 1) % shuffledFemales.length].id;
+          shuffledFemales[(i + offset) % shuffledFemales.length].id;
       assignment[shuffledFemales[i].id] =
-          shuffledMales[(i + 1) % shuffledMales.length].id;
+          shuffledMales[(i + offset) % shuffledMales.length].id;
+    }
+    // Verify no mutual pairs slipped through (only possible when N==2).
+    for (final entry in assignment.entries) {
+      final recipientGiftee = assignment[entry.value];
+      if (recipientGiftee == entry.key) return null;
     }
     return assignment;
   }
@@ -72,7 +82,10 @@ Map<String, String>? _attemptRandomDerangement(
   final shuffled = List.of(ids)..shuffle(random);
 
   for (var i = 0; i < ids.length; i++) {
+    // Reject self-assignment and mutual pairs (A→B and B→A).
     if (shuffled[i] == ids[i]) return null;
+    final j = ids.indexOf(shuffled[i]);
+    if (shuffled[j] == ids[i]) return null;
   }
 
   return Map.fromIterables(ids, shuffled);
