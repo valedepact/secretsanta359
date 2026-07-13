@@ -62,7 +62,8 @@ class _ManualCodeEntryState extends State<_ManualCodeEntry> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return SingleChildScrollView(
+      child: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
@@ -105,6 +106,7 @@ class _ManualCodeEntryState extends State<_ManualCodeEntry> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -191,12 +193,12 @@ class _JoinFormState extends State<_JoinForm> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (group.status != 'draft') {
+    if (group.status != 'draft' && group.status != 'drawn') {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'This group has already drawn names and is no longer accepting new participants.',
+            'This group is no longer accepting new participants.',
             textAlign: TextAlign.center,
           ),
         ),
@@ -231,6 +233,7 @@ class _InlineSignInState extends State<_InlineSignIn> {
   final _passwordController = TextEditingController();
   bool _isRegistering = false;
   bool _isSubmitting = false;
+  bool _isGoogleSubmitting = false;
   String? _error;
 
   @override
@@ -260,10 +263,28 @@ class _InlineSignInState extends State<_InlineSignIn> {
     }
   }
 
+  Future<void> _submitGoogle() async {
+    setState(() {
+      _isGoogleSubmitting = true;
+      _error = null;
+    });
+    try {
+      // On web this redirects the whole page to Google and back to the
+      // current URL (invite code included), so onAuthenticated() isn't
+      // called here - _JoinForm re-checks AuthService.isSignedIn on reload.
+      await AuthService.signInWithGoogle();
+    } catch (e) {
+      setState(() => _error = friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _isGoogleSubmitting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
-    return Center(
+    return SingleChildScrollView(
+      child: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Padding(
@@ -325,10 +346,37 @@ class _InlineSignInState extends State<_InlineSignIn> {
                         : 'New here? Create an account',
                   ),
                 ),
+                const SizedBox(height: 12),
+                const Row(
+                  children: [
+                    Expanded(child: Divider()),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('or'),
+                    ),
+                    Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _isGoogleSubmitting ? null : _submitGoogle,
+                  icon: _isGoogleSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.g_mobiledata, size: 28),
+                  label: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Continue with Google'),
+                  ),
+                ),
               ],
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -392,7 +440,8 @@ class _ProfileFormState extends State<_ProfileForm> {
   @override
   Widget build(BuildContext context) {
     final group = widget.group;
-    return Center(
+    return SingleChildScrollView(
+      child: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
@@ -457,6 +506,7 @@ class _ProfileFormState extends State<_ProfileForm> {
           ),
         ),
       ),
+      ),
     );
   }
 }
@@ -496,7 +546,8 @@ class _RevealViewState extends State<_RevealView> {
           );
         }
         final reveal = snapshot.data!;
-        return Center(
+        return SingleChildScrollView(
+          child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Padding(
@@ -519,6 +570,7 @@ class _RevealViewState extends State<_RevealView> {
                 ],
               ),
             ),
+          ),
           ),
         );
       },

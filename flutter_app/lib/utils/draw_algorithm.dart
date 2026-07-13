@@ -36,6 +36,25 @@ Map<String, String>? drawAssignments(
   return null;
 }
 
+/// Variant of [drawAssignments] for pairing up latecomers who joined after
+/// the main draw, triggered manually by the organizer. Identical rules for
+/// 3+ people (still rejects mutual pairs and self-assignment), but with
+/// exactly 2 people waiting, a mutual pair is unavoidable - it's the only
+/// possible outcome - so it's allowed here (unlike the main draw).
+Map<String, String>? drawLatecomerAssignments(
+  List<Participant> pending, [
+  Random? rng,
+]) {
+  if (pending.length < 2) return null;
+  if (pending.length == 2) {
+    return {
+      pending[0].id: pending[1].id,
+      pending[1].id: pending[0].id,
+    };
+  }
+  return drawAssignments(pending, rng);
+}
+
 Map<String, String>? _attemptCrossGenderDraw(
   List<Participant> males,
   List<Participant> females,

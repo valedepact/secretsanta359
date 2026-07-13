@@ -136,4 +136,28 @@ class ParticipantService {
       'p_assignments': payload,
     });
   }
+
+  /// Organizer-only: pairs up participants who joined after the main draw.
+  /// Only touches the unassigned rows - everyone already drawn keeps their
+  /// original assignment and is not re-notified.
+  static Future<void> drawLatecomersAndAssign(String groupId) async {
+    final participants = await forGroup(groupId);
+    final pending = participants.where((p) => p.assignedToId == null).toList();
+    final assignment = drawLatecomerAssignments(pending);
+    if (assignment == null) {
+      throw Exception('Need at least 2 people waiting to pair them up.');
+    }
+    final byId = {for (final p in pending) p.id: p};
+
+    final payload = assignment.entries.map((e) => {
+      'giver_id': e.key,
+      'giftee_id': e.value,
+      'giftee_name': byId[e.value]!.name,
+    }).toList();
+
+    await _client.rpc('perform_latecomer_draw', params: {
+      'p_group_id': groupId,
+      'p_assignments': payload,
+    });
+  }
 }

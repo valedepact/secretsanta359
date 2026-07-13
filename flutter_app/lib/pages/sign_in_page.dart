@@ -16,6 +16,7 @@ class _SignInPageState extends State<SignInPage> {
   final _passwordController = TextEditingController();
   bool _isRegistering = false;
   bool _isSubmitting = false;
+  bool _isGoogleSubmitting = false;
   String? _error;
 
   @override
@@ -45,11 +46,26 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
+  Future<void> _submitGoogle() async {
+    setState(() {
+      _isGoogleSubmitting = true;
+      _error = null;
+    });
+    try {
+      await AuthService.signInWithGoogle();
+    } catch (e) {
+      setState(() => _error = friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _isGoogleSubmitting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(_isRegistering ? 'Create account' : 'Sign in')),
-      body: Center(
+      body: SingleChildScrollView(
+        child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Padding(
@@ -100,10 +116,37 @@ class _SignInPageState extends State<SignInPage> {
                           : 'New here? Create an account',
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('or'),
+                      ),
+                      Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _isGoogleSubmitting ? null : _submitGoogle,
+                    icon: _isGoogleSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.g_mobiledata, size: 28),
+                    label: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Continue with Google'),
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
+        ),
         ),
       ),
     );

@@ -108,4 +108,9 @@ class GroupService {
         .update({'status': groupStatusToString(status)})
         .eq('id', groupId);
   }
+
+  /// Organizer-only: deletes a group and all its participants (cascade).
+  static Future<void> delete(String groupId) async {
+    await _client.from('groups').delete().eq('id', groupId);
+  }
 }

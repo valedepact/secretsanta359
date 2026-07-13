@@ -68,7 +68,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Create Group')),
-      body: Center(
+      body: SingleChildScrollView(
+        child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: Padding(
@@ -137,6 +138,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );

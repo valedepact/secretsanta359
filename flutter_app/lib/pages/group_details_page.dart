@@ -24,6 +24,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   List<Participant> _participants = [];
   bool _isLoading = true;
   bool _isDrawing = false;
+  bool _isDrawingLatecomers = false;
   String? _error;
 
   @override
@@ -169,6 +170,28 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
   }
 
   Future<void> _draw() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Draw names?'),
+        content: const Text(
+          'Everyone will be assigned a Secret Santa and reveal emails will go '
+          'out immediately. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Draw'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     setState(() {
       _isDrawing = true;
       _error = null;
@@ -186,6 +209,47 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
+  Future<void> _drawLatecomers(int pendingCount) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pair up latecomers?'),
+        content: Text(
+          '$pendingCount people who joined after the draw will be assigned a '
+          'Secret Santa among themselves and reveal emails will go out to just '
+          'them immediately. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Pair up'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() {
+      _isDrawingLatecomers = true;
+      _error = null;
+    });
+    try {
+      await ParticipantService.drawLatecomersAndAssign(widget.groupId);
+      // Fire-and-forget: only the newly-paired latecomers get emailed,
+      // thanks to notified_at gating in the edge function.
+      EmailService.sendRevealEmails(widget.groupId);
+      await _load();
+    } catch (e) {
+      setState(() => _error = friendlyError(e));
+    } finally {
+      setState(() => _isDrawingLatecomers = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -196,6 +260,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
     final group = _group!;
     final canDraw = group.status == GroupStatus.draft && _participants.length >= 2;
+    final pendingCount = _participants.where((p) => !p.hasBeenAssigned).length;
 
     return Scaffold(
       appBar: AppBar(title: Text(group.name)),
@@ -285,7 +350,7 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                         ),
                 ),
               )
-            else
+            else ...[
               Text(
                 group.status == GroupStatus.drawn
                     ? 'Names have been drawn. Reveal unlocks on '
@@ -293,6 +358,32 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
                     : 'Completed',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
+              if (group.status == GroupStatus.drawn && pendingCount >= 2) ...[
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _isDrawingLatecomers
+                      ? null
+                      : () => _drawLatecomers(pendingCount),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: _isDrawingLatecomers
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text('Pair up $pendingCount latecomers'),
+                  ),
+                ),
+              ] else if (group.status == GroupStatus.drawn && pendingCount == 1) ...[
+                const SizedBox(height: 16),
+                Text(
+                  '1 person is waiting to be paired up - this becomes possible '
+                  'once one more person joins.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
           ],
         ),
       ),

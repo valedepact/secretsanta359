@@ -19,6 +19,13 @@ class AuthService {
     await _client.auth.signInWithPassword(email: email, password: password);
   }
 
+  static Future<void> signInWithGoogle() async {
+    await _client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: Uri.base.toString(),
+    );
+  }
+
   static Future<void> signOut() async {
     await _client.auth.signOut();
   }

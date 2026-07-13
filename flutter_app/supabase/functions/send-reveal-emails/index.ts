@@ -1,6 +1,10 @@
 // Supabase Edge Function: send-reveal-emails
-// Triggered (fire-and-forget) by the organizer right after a draw.
-// Emails every participant who provided an address their personal reveal link.
+// Triggered (fire-and-forget) right after a draw, and again after every
+// participant join (a no-op unless a latecomer pairing just happened).
+// Only emails participants with notified_at still null, so re-invoking this
+// after a partial/incremental (latecomer) pairing never re-emails anyone
+// who was already notified. A full redraw resets notified_at for everyone,
+// so it correctly re-notifies the whole group in that case.
 //
 // Required secrets (set with `supabase secrets set`):
 //   GMAIL_USER            - the Gmail address to send from
@@ -18,16 +22,24 @@ const GMAIL_USER = Deno.env.get("GMAIL_USER")!;
 const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD")!;
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "https://secretsanta359.app";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }
 
   const { group_id } = await req.json();
   if (!group_id) {
     return new Response(JSON.stringify({ error: "group_id is required" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -41,19 +53,21 @@ Deno.serve(async (req) => {
   if (groupError || !group) {
     return new Response(JSON.stringify({ error: "Group not found" }), {
       status: 404,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   const { data: participants, error: participantsError } = await supabase
     .from("participants")
-    .select("name, email, reveal_code")
+    .select("id, name, email, reveal_code")
     .eq("group_id", group_id)
-    .not("email", "is", null);
+    .not("email", "is", null)
+    .not("assigned_to_id", "is", null)
+    .is("notified_at", null);
   if (participantsError) {
     return new Response(JSON.stringify({ error: participantsError.message }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -81,6 +95,10 @@ Deno.serve(async (req) => {
           <p>The full group reveal unlocks on the event date.</p>
         `,
       });
+      await supabase
+        .from("participants")
+        .update({ notified_at: new Date().toISOString() })
+        .eq("id", participant.id);
       results.push({ email: participant.email, sent: true });
     } catch (err) {
       console.error(`Failed to send to ${participant.email}:`, err);
@@ -89,6 +107,6 @@ Deno.serve(async (req) => {
   }
 
   return new Response(JSON.stringify({ results }), {
-    headers: { "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

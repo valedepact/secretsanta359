@@ -29,6 +29,33 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  Future<void> _deleteGroup(Group group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete group?'),
+        content: Text(
+          '"${group.name}" and all its participants will be permanently deleted. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await GroupService.delete(group.id);
+    _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,6 +94,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 await context.push('/group/${group.id}');
                 _refresh();
               },
+              onDelete: _deleteGroup,
             ),
             const SizedBox(height: 24),
             Text('Participating in', style: Theme.of(context).textTheme.titleMedium),
@@ -90,8 +118,14 @@ class _GroupList extends StatelessWidget {
   final Future<List<Group>> future;
   final String emptyText;
   final void Function(Group group) onTap;
+  final void Function(Group group)? onDelete;
 
-  const _GroupList({required this.future, required this.emptyText, required this.onTap});
+  const _GroupList({
+    required this.future,
+    required this.emptyText,
+    required this.onTap,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +158,19 @@ class _GroupList extends StatelessWidget {
                         '${group.budget.toStringAsFixed(0)} ${group.currency} - '
                         '${groupStatusToString(group.status)}',
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: onDelete == null
+                          ? const Icon(Icons.chevron_right)
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  tooltip: 'Delete group',
+                                  onPressed: () => onDelete!(group),
+                                ),
+                                const Icon(Icons.chevron_right),
+                              ],
+                            ),
                       onTap: () => onTap(group),
                     ),
                   ))

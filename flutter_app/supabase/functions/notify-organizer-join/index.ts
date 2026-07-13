@@ -16,16 +16,24 @@ const GMAIL_USER = Deno.env.get("GMAIL_USER")!;
 const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD")!;
 const APP_BASE_URL = Deno.env.get("APP_BASE_URL") ?? "https://secretsanta359.app";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }
 
   const { group_id, participant_name } = await req.json();
   if (!group_id || !participant_name) {
     return new Response(
       JSON.stringify({ error: "group_id and participant_name are required" }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
@@ -39,7 +47,7 @@ Deno.serve(async (req) => {
   if (groupError || !group) {
     return new Response(JSON.stringify({ error: "Group not found" }), {
       status: 404,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -48,7 +56,7 @@ Deno.serve(async (req) => {
   if (organizerError || !organizer.user?.email) {
     return new Response(JSON.stringify({ error: "Organizer not found" }), {
       status: 404,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -72,13 +80,13 @@ Deno.serve(async (req) => {
       `,
     });
     return new Response(JSON.stringify({ sent: true }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("Failed to notify organizer:", err);
     return new Response(JSON.stringify({ sent: false, error: String(err) }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
