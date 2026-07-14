@@ -14,12 +14,14 @@ class EmailService {
   }
 
   /// Fire-and-forget call to notify the organizer that someone joined.
+  /// The participant's name is looked up server-side from their own row (via
+  /// their session) rather than sent from here, so there's nothing to trust.
   /// Failures are swallowed - a notification email must never block joining.
-  static Future<void> notifyOrganizerOfJoin(String groupId, String participantName) async {
+  static Future<void> notifyOrganizerOfJoin(String groupId) async {
     try {
       await SupabaseService.client.functions.invoke(
         'notify-organizer-join',
-        body: {'group_id': groupId, 'participant_name': participantName},
+        body: {'group_id': groupId},
       );
     } catch (_) {
       // Intentionally ignored.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/group.dart';
 import '../models/participant.dart';
@@ -141,6 +142,99 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     }
   }
 
+  Future<void> _editGroup() async {
+    final group = _group!;
+    final budgetController = TextEditingController(text: group.budget.toStringAsFixed(0));
+    final currencyController = TextEditingController(text: group.currency);
+    final descriptionController = TextEditingController(text: group.description ?? '');
+    DateTime eventDate = group.eventDate;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit group'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: budgetController,
+                  decoration: const InputDecoration(labelText: 'Budget'),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: currencyController,
+                  decoration: const InputDecoration(labelText: 'Currency'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(labelText: 'About'),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: Text('Event date: ${DateFormat.yMMMd().format(eventDate)}')),
+                    TextButton(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: eventDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => eventDate = picked);
+                        }
+                      },
+                      child: const Text('Change'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true) return;
+    final budget = double.tryParse(budgetController.text.trim());
+    if (budget == null || currencyController.text.trim().isEmpty) {
+      setState(() => _error = 'Enter a valid budget and currency.');
+      return;
+    }
+
+    try {
+      await GroupService.update(
+        groupId: widget.groupId,
+        budget: budget,
+        currency: currencyController.text.trim(),
+        eventDate: eventDate,
+        description: descriptionController.text.trim().isEmpty
+            ? null
+            : descriptionController.text.trim(),
+      );
+      await _load();
+    } catch (e) {
+      setState(() => _error = friendlyError(e));
+    }
+  }
+
   Future<void> _removeParticipant(Participant participant) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -263,7 +357,21 @@ class _GroupDetailsPageState extends State<GroupDetailsPage> {
     final pendingCount = _participants.where((p) => !p.hasBeenAssigned).length;
 
     return Scaffold(
-      appBar: AppBar(title: Text(group.name)),
+      appBar: AppBar(
+        title: Text(group.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => context.go('/'),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Edit group',
+            onPressed: _editGroup,
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

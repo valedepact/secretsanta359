@@ -23,20 +23,25 @@ class JoinPage extends StatefulWidget {
 class _JoinPageState extends State<JoinPage> {
   @override
   Widget build(BuildContext context) {
+    final backButton = IconButton(
+      icon: const Icon(Icons.arrow_back),
+      tooltip: 'Back',
+      onPressed: () => context.go('/'),
+    );
     if (widget.revealCode != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Your Secret Santa')),
+        appBar: AppBar(title: const Text('Your Secret Santa'), leading: backButton),
         body: _RevealView(revealCode: widget.revealCode!),
       );
     }
     if (widget.shareCode != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Join Group')),
+        appBar: AppBar(title: const Text('Join Group'), leading: backButton),
         body: _JoinForm(shareCode: widget.shareCode!),
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Join / Reveal')),
+      appBar: AppBar(title: const Text('Join / Reveal'), leading: backButton),
       body: const _ManualCodeEntry(),
     );
   }
@@ -428,7 +433,7 @@ class _ProfileFormState extends State<_ProfileForm> {
         email: AuthService.currentUser?.email,
         wishlist: _wishlistController.text.trim().isEmpty ? null : _wishlistController.text.trim(),
       );
-      EmailService.notifyOrganizerOfJoin(widget.group.id, _nameController.text.trim());
+      EmailService.notifyOrganizerOfJoin(widget.group.id);
       widget.onJoined(widget.group.id);
     } catch (e) {
       widget.onError(friendlyError(e));

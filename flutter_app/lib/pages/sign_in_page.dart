@@ -63,7 +63,14 @@ class _SignInPageState extends State<SignInPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isRegistering ? 'Create account' : 'Sign in')),
+      appBar: AppBar(
+        title: Text(_isRegistering ? 'Create account' : 'Sign in'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => context.go('/'),
+        ),
+      ),
       body: SingleChildScrollView(
         child: Center(
         child: ConstrainedBox(

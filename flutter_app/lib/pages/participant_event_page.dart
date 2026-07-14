@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../models/group.dart';
 import '../models/participant.dart';
@@ -92,7 +93,14 @@ class _ParticipantEventPageState extends State<ParticipantEventPage> {
     final me = _me;
 
     return Scaffold(
-      appBar: AppBar(title: Text(group.name)),
+      appBar: AppBar(
+        title: Text(group.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => context.go('/'),
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

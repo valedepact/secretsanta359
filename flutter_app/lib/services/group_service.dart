@@ -113,4 +113,29 @@ class GroupService {
   static Future<void> delete(String groupId) async {
     await _client.from('groups').delete().eq('id', groupId);
   }
+
+  /// Organizer-only: edits everything about a group except its name, which
+  /// stays fixed once created. Event date stays editable even after the
+  /// draw - the day-before reminder re-derives itself from the live
+  /// event_date each day, so rescheduling just follows naturally.
+  static Future<Group> update({
+    required String groupId,
+    required double budget,
+    required String currency,
+    required DateTime eventDate,
+    String? description,
+  }) async {
+    final row = await _client
+        .from('groups')
+        .update({
+          'budget': budget,
+          'currency': currency,
+          'event_date': eventDate.toIso8601String(),
+          'description': description,
+        })
+        .eq('id', groupId)
+        .select()
+        .single();
+    return Group.fromJson(row);
+  }
 }

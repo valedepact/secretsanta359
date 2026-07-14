@@ -17,6 +17,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import nodemailer from "npm:nodemailer@6.9.16";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GMAIL_USER = Deno.env.get("GMAIL_USER")!;
 const GMAIL_APP_PASSWORD = Deno.env.get("GMAIL_APP_PASSWORD")!;
@@ -26,6 +27,15 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -43,16 +53,40 @@ Deno.serve(async (req) => {
     });
   }
 
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const authClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error: authError } = await authClient.auth.getUser();
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Invalid session" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   const { data: group, error: groupError } = await supabase
     .from("groups")
-    .select("name, event_date")
+    .select("name, event_date, organizer_id")
     .eq("id", group_id)
     .single();
   if (groupError || !group) {
     return new Response(JSON.stringify({ error: "Group not found" }), {
       status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (group.organizer_id !== user.id) {
+    return new Response(JSON.stringify({ error: "Not authorized for this group" }), {
+      status: 403,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -88,8 +122,8 @@ Deno.serve(async (req) => {
         to: participant.email,
         subject: `Names have been drawn for ${group.name}!`,
         html: `
-          <p>Hi ${participant.name},</p>
-          <p>Names have been drawn for <strong>${group.name}</strong>.</p>
+          <p>Hi ${escapeHtml(participant.name)},</p>
+          <p>Names have been drawn for <strong>${escapeHtml(group.name)}</strong>.</p>
           <p>Your personal reveal code is <strong>${participant.reveal_code}</strong>.</p>
           <p>See who you're gifting here: <a href="${revealUrl}">${revealUrl}</a></p>
           <p>The full group reveal unlocks on the event date.</p>
